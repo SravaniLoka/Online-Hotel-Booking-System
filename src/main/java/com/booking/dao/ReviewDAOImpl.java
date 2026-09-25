@@ -4,6 +4,8 @@ import com.booking.model.Hotel;
 import com.booking.model.Review;
 import com.booking.model.User;
 import com.booking.util.DBConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -15,18 +17,50 @@ import java.util.List;
 
 public class ReviewDAOImpl implements ReviewDAO {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(ReviewDAOImpl.class);
+
+    // SQL queries
+    private static final String REVIEW_CREATE_SQL = """
+            INSERT INTO review
+            (user_id, hotel_id, rating, comment)
+            VALUES (?, ?, ?, ?)
+            """;
+
+    private static final String REVIEW_FIND_BY_ID_SQL = """
+            SELECT review_id, user_id, hotel_id, rating, comment
+            FROM review
+            WHERE review_id = ?
+            """;
+
+    private static final String REVIEW_FIND_ALL_SQL = """
+            SELECT review_id, user_id, hotel_id, rating, comment
+            FROM review
+            ORDER BY review_id
+            """;
+
+    private static final String REVIEW_UPDATE_SQL = """
+            UPDATE review
+            SET user_id = ?,
+                hotel_id = ?,
+                rating = ?,
+                comment = ?
+            WHERE review_id = ?
+            """;
+
+    private static final String REVIEW_DELETE_SQL = """
+            DELETE FROM review
+            WHERE review_id = ?
+            """;
+
     @Override
     public boolean create(Review review) {
 
-        String sql = """
-                INSERT INTO review
-                (user_id, hotel_id, rating, comment)
-                VALUES (?, ?, ?, ?)
-                """;
+        logger.info("create() started");
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     sql,
+                     REVIEW_CREATE_SQL,
                      Statement.RETURN_GENERATED_KEYS)) {
 
             statement.setLong(1, review.getUser().getUserId());
@@ -45,12 +79,23 @@ public class ReviewDAOImpl implements ReviewDAO {
                     }
                 }
 
+                logger.info(
+                        "create() completed successfully. reviewId={}",
+                        review.getReviewId()
+                );
+
                 return true;
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while creating review",
+                    e
+            );
         }
+
+        logger.info("create() completed with failure");
 
         return false;
     }
@@ -58,27 +103,46 @@ public class ReviewDAOImpl implements ReviewDAO {
     @Override
     public Review findById(long reviewId) {
 
-        String sql = """
-                SELECT review_id, user_id, hotel_id, rating, comment
-                FROM review
-                WHERE review_id = ?
-                """;
+        logger.info(
+                "findById() started. reviewId={}",
+                reviewId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(REVIEW_FIND_BY_ID_SQL)) {
 
             statement.setLong(1, reviewId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
                 if (resultSet.next()) {
-                    return mapResultSetToReview(resultSet);
+
+                    Review review =
+                            mapResultSetToReview(resultSet);
+
+                    logger.info(
+                            "findById() completed successfully. reviewId={}",
+                            reviewId
+                    );
+
+                    return review;
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while finding review. reviewId={}",
+                    reviewId,
+                    e
+            );
         }
+
+        logger.info(
+                "findById() completed. Review not found. reviewId={}",
+                reviewId
+        );
 
         return null;
     }
@@ -86,16 +150,13 @@ public class ReviewDAOImpl implements ReviewDAO {
     @Override
     public List<Review> findAll() {
 
+        logger.info("findAll() started");
+
         List<Review> reviews = new ArrayList<>();
 
-        String sql = """
-                SELECT review_id, user_id, hotel_id, rating, comment
-                FROM review
-                ORDER BY review_id
-                """;
-
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
+             PreparedStatement statement =
+                     connection.prepareStatement(REVIEW_FIND_ALL_SQL);
              ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
@@ -105,8 +166,17 @@ public class ReviewDAOImpl implements ReviewDAO {
                 );
             }
 
+            logger.info(
+                    "findAll() completed successfully. reviewsFound={}",
+                    reviews.size()
+            );
+
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while retrieving all reviews",
+                    e
+            );
         }
 
         return reviews;
@@ -115,17 +185,14 @@ public class ReviewDAOImpl implements ReviewDAO {
     @Override
     public boolean update(Review review) {
 
-        String sql = """
-                UPDATE review
-                SET user_id = ?,
-                    hotel_id = ?,
-                    rating = ?,
-                    comment = ?
-                WHERE review_id = ?
-                """;
+        logger.info(
+                "update() started. reviewId={}",
+                review.getReviewId()
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(REVIEW_UPDATE_SQL)) {
 
             statement.setLong(1, review.getUser().getUserId());
             statement.setLong(2, review.getHotel().getHotelId());
@@ -133,10 +200,32 @@ public class ReviewDAOImpl implements ReviewDAO {
             statement.setString(4, review.getComment());
             statement.setLong(5, review.getReviewId());
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update() completed successfully. reviewId={}",
+                        review.getReviewId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update() completed. No review updated. reviewId={}",
+                        review.getReviewId()
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while updating review. reviewId={}",
+                    review.getReviewId(),
+                    e
+            );
         }
 
         return false;
@@ -145,20 +234,43 @@ public class ReviewDAOImpl implements ReviewDAO {
     @Override
     public boolean delete(long reviewId) {
 
-        String sql = """
-                DELETE FROM review
-                WHERE review_id = ?
-                """;
+        logger.info(
+                "delete() started. reviewId={}",
+                reviewId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(REVIEW_DELETE_SQL)) {
 
             statement.setLong(1, reviewId);
 
-            return statement.executeUpdate() > 0;
+            boolean deleted = statement.executeUpdate() > 0;
+
+            if (deleted) {
+
+                logger.info(
+                        "delete() completed successfully. reviewId={}",
+                        reviewId
+                );
+
+            } else {
+
+                logger.info(
+                        "delete() completed. No review deleted. reviewId={}",
+                        reviewId
+                );
+            }
+
+            return deleted;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while deleting review. reviewId={}",
+                    reviewId,
+                    e
+            );
         }
 
         return false;
@@ -167,22 +279,33 @@ public class ReviewDAOImpl implements ReviewDAO {
     private Review mapResultSetToReview(ResultSet resultSet)
             throws SQLException {
 
+        logger.info("mapResultSetToReview() started");
+
         User user = new User();
+
         user.setUserId(
                 resultSet.getLong("user_id")
         );
 
         Hotel hotel = new Hotel();
+
         hotel.setHotelId(
                 resultSet.getLong("hotel_id")
         );
 
-        return new Review(
+        Review review = new Review(
                 resultSet.getLong("review_id"),
                 user,
                 hotel,
                 resultSet.getInt("rating"),
                 resultSet.getString("comment")
         );
+
+        logger.info(
+                "mapResultSetToReview() completed successfully. reviewId={}",
+                review.getReviewId()
+        );
+
+        return review;
     }
 }

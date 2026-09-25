@@ -3,6 +3,8 @@ package com.booking.dao;
 import com.booking.model.Hotel;
 import com.booking.model.Location;
 import com.booking.util.DBConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -10,22 +12,60 @@ import java.util.List;
 
 public class HotelDAOImpl implements HotelDAO {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(HotelDAOImpl.class);
+
+    // SQL queries
+    private static final String HOTEL_CREATE_SQL = """
+            INSERT INTO hotel
+            (location_id, name, description, address,
+             star_rating, amenities, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """;
+
+    private static final String HOTEL_FIND_BY_ID_SQL = """
+            SELECT hotel_id, location_id, name, description,
+                   address, star_rating, amenities, status
+            FROM hotel
+            WHERE hotel_id = ?
+            """;
+
+    private static final String HOTEL_FIND_ALL_SQL = """
+            SELECT hotel_id, location_id, name, description,
+                   address, star_rating, amenities, status
+            FROM hotel
+            ORDER BY hotel_id
+            """;
+
+    private static final String HOTEL_UPDATE_SQL = """
+            UPDATE hotel
+            SET location_id = ?,
+                name = ?,
+                description = ?,
+                address = ?,
+                star_rating = ?,
+                amenities = ?,
+                status = ?
+            WHERE hotel_id = ?
+            """;
+
+    private static final String HOTEL_DELETE_SQL =
+            "DELETE FROM hotel WHERE hotel_id = ?";
+
     @Override
     public boolean create(Hotel hotel) {
 
-        String sql = """
-                INSERT INTO hotel
-                (location_id, name, description, address,
-                 star_rating, amenities, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """;
+        logger.info("create() started");
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     sql,
+                     HOTEL_CREATE_SQL,
                      Statement.RETURN_GENERATED_KEYS)) {
 
-            statement.setLong(1, hotel.getLocation().getLocationId());
+            statement.setLong(
+                    1,
+                    hotel.getLocation().getLocationId()
+            );
             statement.setString(2, hotel.getName());
             statement.setString(3, hotel.getDescription());
             statement.setString(4, hotel.getAddress());
@@ -44,12 +84,23 @@ public class HotelDAOImpl implements HotelDAO {
                     }
                 }
 
+                logger.info(
+                        "create() completed successfully. hotelId={}",
+                        hotel.getHotelId()
+                );
+
                 return true;
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while creating hotel",
+                    e
+            );
         }
+
+        logger.info("create() completed with failure");
 
         return false;
     }
@@ -57,28 +108,46 @@ public class HotelDAOImpl implements HotelDAO {
     @Override
     public Hotel findById(long hotelId) {
 
-        String sql = """
-                SELECT hotel_id, location_id, name, description,
-                       address, star_rating, amenities, status
-                FROM hotel
-                WHERE hotel_id = ?
-                """;
+        logger.info(
+                "findById() started. hotelId={}",
+                hotelId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(HOTEL_FIND_BY_ID_SQL)) {
 
             statement.setLong(1, hotelId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
                 if (resultSet.next()) {
-                    return mapResultSetToHotel(resultSet);
+
+                    Hotel hotel =
+                            mapResultSetToHotel(resultSet);
+
+                    logger.info(
+                            "findById() completed successfully. hotelId={}",
+                            hotelId
+                    );
+
+                    return hotel;
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while finding hotel. hotelId={}",
+                    hotelId,
+                    e
+            );
         }
+
+        logger.info(
+                "findById() completed. Hotel not found. hotelId={}",
+                hotelId
+        );
 
         return null;
     }
@@ -86,25 +155,33 @@ public class HotelDAOImpl implements HotelDAO {
     @Override
     public List<Hotel> findAll() {
 
+        logger.info("findAll() started");
+
         List<Hotel> hotels = new ArrayList<>();
 
-        String sql = """
-                SELECT hotel_id, location_id, name, description,
-                       address, star_rating, amenities, status
-                FROM hotel
-                ORDER BY hotel_id
-                """;
-
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
+             PreparedStatement statement =
+                     connection.prepareStatement(HOTEL_FIND_ALL_SQL);
              ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
-                hotels.add(mapResultSetToHotel(resultSet));
+
+                hotels.add(
+                        mapResultSetToHotel(resultSet)
+                );
             }
 
+            logger.info(
+                    "findAll() completed successfully. hotelsFound={}",
+                    hotels.size()
+            );
+
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while retrieving all hotels",
+                    e
+            );
         }
 
         return hotels;
@@ -113,22 +190,19 @@ public class HotelDAOImpl implements HotelDAO {
     @Override
     public boolean update(Hotel hotel) {
 
-        String sql = """
-                UPDATE hotel
-                SET location_id = ?,
-                    name = ?,
-                    description = ?,
-                    address = ?,
-                    star_rating = ?,
-                    amenities = ?,
-                    status = ?
-                WHERE hotel_id = ?
-                """;
+        logger.info(
+                "update() started. hotelId={}",
+                hotel.getHotelId()
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(HOTEL_UPDATE_SQL)) {
 
-            statement.setLong(1, hotel.getLocation().getLocationId());
+            statement.setLong(
+                    1,
+                    hotel.getLocation().getLocationId()
+            );
             statement.setString(2, hotel.getName());
             statement.setString(3, hotel.getDescription());
             statement.setString(4, hotel.getAddress());
@@ -137,10 +211,32 @@ public class HotelDAOImpl implements HotelDAO {
             statement.setString(7, hotel.getStatus());
             statement.setLong(8, hotel.getHotelId());
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update() completed successfully. hotelId={}",
+                        hotel.getHotelId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update() completed. No hotel updated. hotelId={}",
+                        hotel.getHotelId()
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while updating hotel. hotelId={}",
+                    hotel.getHotelId(),
+                    e
+            );
         }
 
         return false;
@@ -149,28 +245,60 @@ public class HotelDAOImpl implements HotelDAO {
     @Override
     public boolean delete(long hotelId) {
 
-        String sql = "DELETE FROM hotel WHERE hotel_id = ?";
+        logger.info(
+                "delete() started. hotelId={}",
+                hotelId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(HOTEL_DELETE_SQL)) {
 
             statement.setLong(1, hotelId);
 
-            return statement.executeUpdate() > 0;
+            boolean deleted = statement.executeUpdate() > 0;
+
+            if (deleted) {
+
+                logger.info(
+                        "delete() completed successfully. hotelId={}",
+                        hotelId
+                );
+
+            } else {
+
+                logger.info(
+                        "delete() completed. No hotel deleted. hotelId={}",
+                        hotelId
+                );
+            }
+
+            return deleted;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while deleting hotel. hotelId={}",
+                    hotelId,
+                    e
+            );
         }
 
         return false;
     }
 
-    private Hotel mapResultSetToHotel(ResultSet resultSet) throws SQLException {
+    private Hotel mapResultSetToHotel(ResultSet resultSet)
+            throws SQLException {
+
+        logger.info("mapResultSetToHotel() started");
 
         Location location = new Location();
-        location.setLocationId(resultSet.getLong("location_id"));
 
-        return new Hotel(
+        location.setLocationId(
+                resultSet.getLong("location_id")
+        );
+
+        Hotel hotel = new Hotel(
                 resultSet.getLong("hotel_id"),
                 location,
                 resultSet.getString("name"),
@@ -180,5 +308,12 @@ public class HotelDAOImpl implements HotelDAO {
                 resultSet.getString("amenities"),
                 resultSet.getString("status")
         );
+
+        logger.info(
+                "mapResultSetToHotel() completed successfully. hotelId={}",
+                hotel.getHotelId()
+        );
+
+        return hotel;
     }
 }

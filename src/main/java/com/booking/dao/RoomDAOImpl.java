@@ -3,6 +3,8 @@ package com.booking.dao;
 import com.booking.model.Hotel;
 import com.booking.model.Room;
 import com.booking.util.DBConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,18 +16,54 @@ import java.util.List;
 
 public class RoomDAOImpl implements RoomDAO {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(RoomDAOImpl.class);
+
+    // SQL queries
+    private static final String ROOM_CREATE_SQL = """
+            INSERT INTO room
+            (hotel_id, room_number, room_type, capacity, base_price, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """;
+
+    private static final String ROOM_FIND_BY_ID_SQL = """
+            SELECT room_id, hotel_id, room_number,
+                   room_type, capacity, base_price, status
+            FROM room
+            WHERE room_id = ?
+            """;
+
+    private static final String ROOM_FIND_ALL_SQL = """
+            SELECT room_id, hotel_id, room_number,
+                   room_type, capacity, base_price, status
+            FROM room
+            ORDER BY room_id
+            """;
+
+    private static final String ROOM_UPDATE_SQL = """
+            UPDATE room
+            SET hotel_id = ?,
+                room_number = ?,
+                room_type = ?,
+                capacity = ?,
+                base_price = ?,
+                status = ?
+            WHERE room_id = ?
+            """;
+
+    private static final String ROOM_DELETE_SQL = """
+            DELETE FROM room
+            WHERE room_id = ?
+            """;
+
     @Override
     public boolean create(Room room) {
 
-        String sql = """
-                INSERT INTO room
-                (hotel_id, room_number, room_type, capacity, base_price, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """;
+        logger.info("create() started");
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     sql,
+                     ROOM_CREATE_SQL,
                      Statement.RETURN_GENERATED_KEYS)) {
 
             statement.setLong(1, room.getHotel().getHotelId());
@@ -46,12 +84,23 @@ public class RoomDAOImpl implements RoomDAO {
                     }
                 }
 
+                logger.info(
+                        "create() completed successfully. roomId={}",
+                        room.getRoomId()
+                );
+
                 return true;
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while creating room",
+                    e
+            );
         }
+
+        logger.info("create() completed with failure");
 
         return false;
     }
@@ -59,28 +108,45 @@ public class RoomDAOImpl implements RoomDAO {
     @Override
     public Room findById(long roomId) {
 
-        String sql = """
-                SELECT room_id, hotel_id, room_number,
-                       room_type, capacity, base_price, status
-                FROM room
-                WHERE room_id = ?
-                """;
+        logger.info(
+                "findById() started. roomId={}",
+                roomId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(ROOM_FIND_BY_ID_SQL)) {
 
             statement.setLong(1, roomId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
 
                 if (resultSet.next()) {
-                    return mapResultSetToRoom(resultSet);
+
+                    Room room = mapResultSetToRoom(resultSet);
+
+                    logger.info(
+                            "findById() completed successfully. roomId={}",
+                            roomId
+                    );
+
+                    return room;
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while finding room. roomId={}",
+                    roomId,
+                    e
+            );
         }
+
+        logger.info(
+                "findById() completed. Room not found. roomId={}",
+                roomId
+        );
 
         return null;
     }
@@ -88,17 +154,13 @@ public class RoomDAOImpl implements RoomDAO {
     @Override
     public List<Room> findAll() {
 
+        logger.info("findAll() started");
+
         List<Room> rooms = new ArrayList<>();
 
-        String sql = """
-                SELECT room_id, hotel_id, room_number,
-                       room_type, capacity, base_price, status
-                FROM room
-                ORDER BY room_id
-                """;
-
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
+             PreparedStatement statement =
+                     connection.prepareStatement(ROOM_FIND_ALL_SQL);
              ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
@@ -108,8 +170,17 @@ public class RoomDAOImpl implements RoomDAO {
                 );
             }
 
+            logger.info(
+                    "findAll() completed successfully. roomsFound={}",
+                    rooms.size()
+            );
+
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while retrieving all rooms",
+                    e
+            );
         }
 
         return rooms;
@@ -118,19 +189,14 @@ public class RoomDAOImpl implements RoomDAO {
     @Override
     public boolean update(Room room) {
 
-        String sql = """
-                UPDATE room
-                SET hotel_id = ?,
-                    room_number = ?,
-                    room_type = ?,
-                    capacity = ?,
-                    base_price = ?,
-                    status = ?
-                WHERE room_id = ?
-                """;
+        logger.info(
+                "update() started. roomId={}",
+                room.getRoomId()
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(ROOM_UPDATE_SQL)) {
 
             statement.setLong(1, room.getHotel().getHotelId());
             statement.setString(2, room.getRoomNumber());
@@ -140,10 +206,32 @@ public class RoomDAOImpl implements RoomDAO {
             statement.setString(6, room.getStatus());
             statement.setLong(7, room.getRoomId());
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update() completed successfully. roomId={}",
+                        room.getRoomId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update() completed. No room updated. roomId={}",
+                        room.getRoomId()
+                );
+            }
+
+            return updated;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while updating room. roomId={}",
+                    room.getRoomId(),
+                    e
+            );
         }
 
         return false;
@@ -152,20 +240,43 @@ public class RoomDAOImpl implements RoomDAO {
     @Override
     public boolean delete(long roomId) {
 
-        String sql = """
-                DELETE FROM room
-                WHERE room_id = ?
-                """;
+        logger.info(
+                "delete() started. roomId={}",
+                roomId
+        );
 
         try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement =
+                     connection.prepareStatement(ROOM_DELETE_SQL)) {
 
             statement.setLong(1, roomId);
 
-            return statement.executeUpdate() > 0;
+            boolean deleted = statement.executeUpdate() > 0;
+
+            if (deleted) {
+
+                logger.info(
+                        "delete() completed successfully. roomId={}",
+                        roomId
+                );
+
+            } else {
+
+                logger.info(
+                        "delete() completed. No room deleted. roomId={}",
+                        roomId
+                );
+            }
+
+            return deleted;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+
+            logger.error(
+                    "Error while deleting room. roomId={}",
+                    roomId,
+                    e
+            );
         }
 
         return false;
@@ -174,13 +285,15 @@ public class RoomDAOImpl implements RoomDAO {
     private Room mapResultSetToRoom(ResultSet resultSet)
             throws SQLException {
 
+        logger.info("mapResultSetToRoom() started");
+
         Hotel hotel = new Hotel();
 
         hotel.setHotelId(
                 resultSet.getLong("hotel_id")
         );
 
-        return new Room(
+        Room room = new Room(
                 resultSet.getLong("room_id"),
                 hotel,
                 resultSet.getString("room_number"),
@@ -189,5 +302,12 @@ public class RoomDAOImpl implements RoomDAO {
                 resultSet.getBigDecimal("base_price"),
                 resultSet.getString("status")
         );
+
+        logger.info(
+                "mapResultSetToRoom() completed successfully. roomId={}",
+                room.getRoomId()
+        );
+
+        return room;
     }
 }
