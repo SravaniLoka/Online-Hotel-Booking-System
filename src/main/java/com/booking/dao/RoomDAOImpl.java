@@ -198,13 +198,7 @@ public class RoomDAOImpl implements RoomDAO {
              PreparedStatement statement =
                      connection.prepareStatement(ROOM_UPDATE_SQL)) {
 
-            statement.setLong(1, room.getHotel().getHotelId());
-            statement.setString(2, room.getRoomNumber());
-            statement.setString(3, room.getRoomType());
-            statement.setInt(4, room.getCapacity());
-            statement.setBigDecimal(5, room.getBasePrice());
-            statement.setString(6, room.getStatus());
-            statement.setLong(7, room.getRoomId());
+            setRoomUpdateParameters(statement, room);
 
             boolean updated = statement.executeUpdate() > 0;
 
@@ -229,6 +223,57 @@ public class RoomDAOImpl implements RoomDAO {
 
             logger.error(
                     "Error while updating room. roomId={}",
+                    room.getRoomId(),
+                    e
+            );
+        }
+
+        return false;
+    }
+
+    // =========================================================
+    // TRANSACTION-AWARE UPDATE
+    // =========================================================
+
+    @Override
+    public boolean update(
+            Room room,
+            Connection connection) {
+
+        logger.info(
+                "update(room, connection) started. roomId={}",
+                room.getRoomId()
+        );
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             ROOM_UPDATE_SQL)) {
+
+            setRoomUpdateParameters(statement, room);
+
+            boolean updated = statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update(room, connection) completed successfully. roomId={}",
+                        room.getRoomId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update(room, connection) completed. No room updated. roomId={}",
+                        room.getRoomId()
+                );
+            }
+
+            return updated;
+
+        } catch (SQLException e) {
+
+            logger.error(
+                    "Error while updating room using transaction. roomId={}",
                     room.getRoomId(),
                     e
             );
@@ -280,6 +325,51 @@ public class RoomDAOImpl implements RoomDAO {
         }
 
         return false;
+    }
+
+    // =========================================================
+    // HELPER: SET ROOM UPDATE PARAMETERS
+    // =========================================================
+
+    private void setRoomUpdateParameters(
+            PreparedStatement statement,
+            Room room)
+            throws SQLException {
+
+        statement.setLong(
+                1,
+                room.getHotel().getHotelId()
+        );
+
+        statement.setString(
+                2,
+                room.getRoomNumber()
+        );
+
+        statement.setString(
+                3,
+                room.getRoomType()
+        );
+
+        statement.setInt(
+                4,
+                room.getCapacity()
+        );
+
+        statement.setBigDecimal(
+                5,
+                room.getBasePrice()
+        );
+
+        statement.setString(
+                6,
+                room.getStatus()
+        );
+
+        statement.setLong(
+                7,
+                room.getRoomId()
+        );
     }
 
     private Room mapResultSetToRoom(ResultSet resultSet)

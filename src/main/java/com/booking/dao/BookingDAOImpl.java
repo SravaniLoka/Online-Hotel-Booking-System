@@ -61,6 +61,11 @@ public class BookingDAOImpl implements BookingDAO {
     private static final String BOOKING_DELETE_SQL =
             "DELETE FROM booking WHERE booking_id = ?";
 
+
+    // =========================================================
+    // NORMAL CREATE
+    // =========================================================
+
     @Override
     public boolean create(Booking booking) {
 
@@ -71,49 +76,13 @@ public class BookingDAOImpl implements BookingDAO {
                      BOOKING_CREATE_SQL,
                      Statement.RETURN_GENERATED_KEYS)) {
 
-            statement.setLong(
-                    1,
-                    booking.getUser().getUserId()
-            );
-            statement.setLong(
-                    2,
-                    booking.getHotel().getHotelId()
-            );
-            statement.setLong(
-                    3,
-                    booking.getRoom().getRoomId()
-            );
-            statement.setDate(
-                    4,
-                    booking.getCheckInDate()
-            );
-            statement.setDate(
-                    5,
-                    booking.getCheckOutDate()
-            );
-            statement.setInt(
-                    6,
-                    booking.getGuests()
-            );
-            statement.setBigDecimal(
-                    7,
-                    booking.getTotalAmount()
-            );
-            statement.setString(
-                    8,
-                    booking.getBookingStatus()
-            );
+            setBookingParameters(statement, booking);
 
             int rowsInserted = statement.executeUpdate();
 
             if (rowsInserted > 0) {
 
-                try (ResultSet keys = statement.getGeneratedKeys()) {
-
-                    if (keys.next()) {
-                        booking.setBookingId(keys.getLong(1));
-                    }
-                }
+                setGeneratedBookingId(statement, booking);
 
                 logger.info(
                         "create() completed successfully. bookingId={}",
@@ -136,6 +105,61 @@ public class BookingDAOImpl implements BookingDAO {
         return false;
     }
 
+
+    // =========================================================
+    // TRANSACTION-AWARE CREATE
+    // =========================================================
+
+    @Override
+    public boolean create(
+            Booking booking,
+            Connection connection) {
+
+        logger.info(
+                "create(booking, connection) started"
+        );
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             BOOKING_CREATE_SQL,
+                             Statement.RETURN_GENERATED_KEYS)) {
+
+            setBookingParameters(statement, booking);
+
+            int rowsInserted = statement.executeUpdate();
+
+            if (rowsInserted > 0) {
+
+                setGeneratedBookingId(statement, booking);
+
+                logger.info(
+                        "create(booking, connection) completed successfully. bookingId={}",
+                        booking.getBookingId()
+                );
+
+                return true;
+            }
+
+        } catch (SQLException e) {
+
+            logger.error(
+                    "Error while creating booking using transaction",
+                    e
+            );
+        }
+
+        logger.info(
+                "create(booking, connection) completed with failure"
+        );
+
+        return false;
+    }
+
+
+    // =========================================================
+    // FIND BY ID
+    // =========================================================
+
     @Override
     public Booking findById(long bookingId) {
 
@@ -151,7 +175,8 @@ public class BookingDAOImpl implements BookingDAO {
 
             statement.setLong(1, bookingId);
 
-            try (ResultSet resultSet = statement.executeQuery()) {
+            try (ResultSet resultSet =
+                         statement.executeQuery()) {
 
                 if (resultSet.next()) {
 
@@ -184,18 +209,25 @@ public class BookingDAOImpl implements BookingDAO {
         return null;
     }
 
+
+    // =========================================================
+    // FIND ALL
+    // =========================================================
+
     @Override
     public List<Booking> findAll() {
 
         logger.info("findAll() started");
 
-        List<Booking> bookings = new ArrayList<>();
+        List<Booking> bookings =
+                new ArrayList<>();
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
                      connection.prepareStatement(
                              BOOKING_FIND_ALL_SQL);
-             ResultSet resultSet = statement.executeQuery()) {
+             ResultSet resultSet =
+                     statement.executeQuery()) {
 
             while (resultSet.next()) {
 
@@ -220,6 +252,11 @@ public class BookingDAOImpl implements BookingDAO {
         return bookings;
     }
 
+
+    // =========================================================
+    // NORMAL UPDATE
+    // =========================================================
+
     @Override
     public boolean update(Booking booking) {
 
@@ -233,44 +270,13 @@ public class BookingDAOImpl implements BookingDAO {
                      connection.prepareStatement(
                              BOOKING_UPDATE_SQL)) {
 
-            statement.setLong(
-                    1,
-                    booking.getUser().getUserId()
-            );
-            statement.setLong(
-                    2,
-                    booking.getHotel().getHotelId()
-            );
-            statement.setLong(
-                    3,
-                    booking.getRoom().getRoomId()
-            );
-            statement.setDate(
-                    4,
-                    booking.getCheckInDate()
-            );
-            statement.setDate(
-                    5,
-                    booking.getCheckOutDate()
-            );
-            statement.setInt(
-                    6,
-                    booking.getGuests()
-            );
-            statement.setBigDecimal(
-                    7,
-                    booking.getTotalAmount()
-            );
-            statement.setString(
-                    8,
-                    booking.getBookingStatus()
-            );
-            statement.setLong(
-                    9,
-                    booking.getBookingId()
+            setBookingUpdateParameters(
+                    statement,
+                    booking
             );
 
-            boolean updated = statement.executeUpdate() > 0;
+            boolean updated =
+                    statement.executeUpdate() > 0;
 
             if (updated) {
 
@@ -301,6 +307,67 @@ public class BookingDAOImpl implements BookingDAO {
         return false;
     }
 
+
+    // =========================================================
+    // TRANSACTION-AWARE UPDATE
+    // =========================================================
+
+    @Override
+    public boolean update(
+            Booking booking,
+            Connection connection) {
+
+        logger.info(
+                "update(booking, connection) started. bookingId={}",
+                booking.getBookingId()
+        );
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             BOOKING_UPDATE_SQL)) {
+
+            setBookingUpdateParameters(
+                    statement,
+                    booking
+            );
+
+            boolean updated =
+                    statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update(booking, connection) completed successfully. bookingId={}",
+                        booking.getBookingId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update(booking, connection) completed. No booking updated. bookingId={}",
+                        booking.getBookingId()
+                );
+            }
+
+            return updated;
+
+        } catch (SQLException e) {
+
+            logger.error(
+                    "Error while updating booking using transaction. bookingId={}",
+                    booking.getBookingId(),
+                    e
+            );
+        }
+
+        return false;
+    }
+
+
+    // =========================================================
+    // DELETE
+    // =========================================================
+
     @Override
     public boolean delete(long bookingId) {
 
@@ -316,7 +383,8 @@ public class BookingDAOImpl implements BookingDAO {
 
             statement.setLong(1, bookingId);
 
-            boolean deleted = statement.executeUpdate() > 0;
+            boolean deleted =
+                    statement.executeUpdate() > 0;
 
             if (deleted) {
 
@@ -347,10 +415,147 @@ public class BookingDAOImpl implements BookingDAO {
         return false;
     }
 
-    private Booking mapResultSetToBooking(ResultSet resultSet)
+
+    // =========================================================
+    // HELPER: SET CREATE PARAMETERS
+    // =========================================================
+
+    private void setBookingParameters(
+            PreparedStatement statement,
+            Booking booking)
             throws SQLException {
 
-        logger.info("mapResultSetToBooking() started");
+        statement.setLong(
+                1,
+                booking.getUser().getUserId()
+        );
+
+        statement.setLong(
+                2,
+                booking.getHotel().getHotelId()
+        );
+
+        statement.setLong(
+                3,
+                booking.getRoom().getRoomId()
+        );
+
+        statement.setDate(
+                4,
+                booking.getCheckInDate()
+        );
+
+        statement.setDate(
+                5,
+                booking.getCheckOutDate()
+        );
+
+        statement.setInt(
+                6,
+                booking.getGuests()
+        );
+
+        statement.setBigDecimal(
+                7,
+                booking.getTotalAmount()
+        );
+
+        statement.setString(
+                8,
+                booking.getBookingStatus()
+        );
+    }
+
+
+    // =========================================================
+    // HELPER: SET UPDATE PARAMETERS
+    // =========================================================
+
+    private void setBookingUpdateParameters(
+            PreparedStatement statement,
+            Booking booking)
+            throws SQLException {
+
+        statement.setLong(
+                1,
+                booking.getUser().getUserId()
+        );
+
+        statement.setLong(
+                2,
+                booking.getHotel().getHotelId()
+        );
+
+        statement.setLong(
+                3,
+                booking.getRoom().getRoomId()
+        );
+
+        statement.setDate(
+                4,
+                booking.getCheckInDate()
+        );
+
+        statement.setDate(
+                5,
+                booking.getCheckOutDate()
+        );
+
+        statement.setInt(
+                6,
+                booking.getGuests()
+        );
+
+        statement.setBigDecimal(
+                7,
+                booking.getTotalAmount()
+        );
+
+        statement.setString(
+                8,
+                booking.getBookingStatus()
+        );
+
+        statement.setLong(
+                9,
+                booking.getBookingId()
+        );
+    }
+
+
+    // =========================================================
+    // HELPER: GENERATED BOOKING ID
+    // =========================================================
+
+    private void setGeneratedBookingId(
+            PreparedStatement statement,
+            Booking booking)
+            throws SQLException {
+
+        try (ResultSet keys =
+                     statement.getGeneratedKeys()) {
+
+            if (keys.next()) {
+
+                booking.setBookingId(
+                        keys.getLong(1)
+                );
+            }
+        }
+    }
+
+
+    // =========================================================
+    // RESULT SET MAPPING
+    // =========================================================
+
+    private Booking mapResultSetToBooking(
+            ResultSet resultSet)
+            throws SQLException {
+
+        logger.info(
+                "mapResultSetToBooking() started"
+        );
 
         User user = new User();
 

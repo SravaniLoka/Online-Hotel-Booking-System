@@ -37,4 +37,33 @@ public class DBConnection {
             throw e;
         }
     }
+
+    public static void beginTransaction(Connection connection)
+            throws SQLException {
+
+        logger.info("Transaction started");
+
+        connection.setAutoCommit(false);
+    }
+
+    public static void commitTransaction(Connection connection)
+            throws SQLException {
+
+        connection.commit();
+
+        logger.info("Transaction committed successfully");
+    }
+
+    public static void rollbackTransaction(Connection connection) {
+
+        try {
+            connection.rollback();
+
+            logger.info("Transaction rolled back successfully");
+
+        } catch (SQLException e) {
+
+            logger.error("Error while rolling back transaction", e);
+        }
+    }
 }

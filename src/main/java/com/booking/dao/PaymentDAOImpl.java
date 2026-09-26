@@ -55,6 +55,11 @@ public class PaymentDAOImpl implements PaymentDAO {
             WHERE payment_id = ?
             """;
 
+
+    // =========================================================
+    // NORMAL CREATE
+    // =========================================================
+
     @Override
     public boolean create(Payment payment) {
 
@@ -65,37 +70,13 @@ public class PaymentDAOImpl implements PaymentDAO {
                      PAYMENT_CREATE_SQL,
                      Statement.RETURN_GENERATED_KEYS)) {
 
-            statement.setLong(
-                    1,
-                    payment.getBooking().getBookingId()
-            );
-            statement.setBigDecimal(
-                    2,
-                    payment.getAmount()
-            );
-            statement.setString(
-                    3,
-                    payment.getPaymentStatus()
-            );
-            statement.setString(
-                    4,
-                    payment.getTransactionRef()
-            );
-            statement.setTimestamp(
-                    5,
-                    payment.getPaidAt()
-            );
+            setPaymentCreateParameters(statement, payment);
 
             int rowsInserted = statement.executeUpdate();
 
             if (rowsInserted > 0) {
 
-                try (ResultSet keys = statement.getGeneratedKeys()) {
-
-                    if (keys.next()) {
-                        payment.setPaymentId(keys.getLong(1));
-                    }
-                }
+                setGeneratedPaymentId(statement, payment);
 
                 logger.info(
                         "create() completed successfully. paymentId={}",
@@ -118,6 +99,61 @@ public class PaymentDAOImpl implements PaymentDAO {
         return false;
     }
 
+
+    // =========================================================
+    // TRANSACTION-AWARE CREATE
+    // =========================================================
+
+    @Override
+    public boolean create(
+            Payment payment,
+            Connection connection) {
+
+        logger.info(
+                "create(payment, connection) started"
+        );
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             PAYMENT_CREATE_SQL,
+                             Statement.RETURN_GENERATED_KEYS)) {
+
+            setPaymentCreateParameters(statement, payment);
+
+            int rowsInserted = statement.executeUpdate();
+
+            if (rowsInserted > 0) {
+
+                setGeneratedPaymentId(statement, payment);
+
+                logger.info(
+                        "create(payment, connection) completed successfully. paymentId={}",
+                        payment.getPaymentId()
+                );
+
+                return true;
+            }
+
+        } catch (SQLException e) {
+
+            logger.error(
+                    "Error while creating payment using transaction",
+                    e
+            );
+        }
+
+        logger.info(
+                "create(payment, connection) completed with failure"
+        );
+
+        return false;
+    }
+
+
+    // =========================================================
+    // FIND BY ID
+    // =========================================================
+
     @Override
     public Payment findById(long paymentId) {
 
@@ -128,7 +164,8 @@ public class PaymentDAOImpl implements PaymentDAO {
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
-                     connection.prepareStatement(PAYMENT_FIND_BY_ID_SQL)) {
+                     connection.prepareStatement(
+                             PAYMENT_FIND_BY_ID_SQL)) {
 
             statement.setLong(1, paymentId);
 
@@ -165,17 +202,25 @@ public class PaymentDAOImpl implements PaymentDAO {
         return null;
     }
 
+
+    // =========================================================
+    // FIND ALL
+    // =========================================================
+
     @Override
     public List<Payment> findAll() {
 
         logger.info("findAll() started");
 
-        List<Payment> payments = new ArrayList<>();
+        List<Payment> payments =
+                new ArrayList<>();
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
-                     connection.prepareStatement(PAYMENT_FIND_ALL_SQL);
-             ResultSet resultSet = statement.executeQuery()) {
+                     connection.prepareStatement(
+                             PAYMENT_FIND_ALL_SQL);
+             ResultSet resultSet =
+                     statement.executeQuery()) {
 
             while (resultSet.next()) {
 
@@ -200,6 +245,11 @@ public class PaymentDAOImpl implements PaymentDAO {
         return payments;
     }
 
+
+    // =========================================================
+    // NORMAL UPDATE
+    // =========================================================
+
     @Override
     public boolean update(Payment payment) {
 
@@ -210,34 +260,16 @@ public class PaymentDAOImpl implements PaymentDAO {
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
-                     connection.prepareStatement(PAYMENT_UPDATE_SQL)) {
+                     connection.prepareStatement(
+                             PAYMENT_UPDATE_SQL)) {
 
-            statement.setLong(
-                    1,
-                    payment.getBooking().getBookingId()
-            );
-            statement.setBigDecimal(
-                    2,
-                    payment.getAmount()
-            );
-            statement.setString(
-                    3,
-                    payment.getPaymentStatus()
-            );
-            statement.setString(
-                    4,
-                    payment.getTransactionRef()
-            );
-            statement.setTimestamp(
-                    5,
-                    payment.getPaidAt()
-            );
-            statement.setLong(
-                    6,
-                    payment.getPaymentId()
+            setPaymentUpdateParameters(
+                    statement,
+                    payment
             );
 
-            boolean updated = statement.executeUpdate() > 0;
+            boolean updated =
+                    statement.executeUpdate() > 0;
 
             if (updated) {
 
@@ -268,6 +300,67 @@ public class PaymentDAOImpl implements PaymentDAO {
         return false;
     }
 
+
+    // =========================================================
+    // TRANSACTION-AWARE UPDATE
+    // =========================================================
+
+    @Override
+    public boolean update(
+            Payment payment,
+            Connection connection) {
+
+        logger.info(
+                "update(payment, connection) started. paymentId={}",
+                payment.getPaymentId()
+        );
+
+        try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             PAYMENT_UPDATE_SQL)) {
+
+            setPaymentUpdateParameters(
+                    statement,
+                    payment
+            );
+
+            boolean updated =
+                    statement.executeUpdate() > 0;
+
+            if (updated) {
+
+                logger.info(
+                        "update(payment, connection) completed successfully. paymentId={}",
+                        payment.getPaymentId()
+                );
+
+            } else {
+
+                logger.info(
+                        "update(payment, connection) completed. No payment updated. paymentId={}",
+                        payment.getPaymentId()
+                );
+            }
+
+            return updated;
+
+        } catch (SQLException e) {
+
+            logger.error(
+                    "Error while updating payment using transaction. paymentId={}",
+                    payment.getPaymentId(),
+                    e
+            );
+        }
+
+        return false;
+    }
+
+
+    // =========================================================
+    // DELETE
+    // =========================================================
+
     @Override
     public boolean delete(long paymentId) {
 
@@ -278,11 +371,13 @@ public class PaymentDAOImpl implements PaymentDAO {
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
-                     connection.prepareStatement(PAYMENT_DELETE_SQL)) {
+                     connection.prepareStatement(
+                             PAYMENT_DELETE_SQL)) {
 
             statement.setLong(1, paymentId);
 
-            boolean deleted = statement.executeUpdate() > 0;
+            boolean deleted =
+                    statement.executeUpdate() > 0;
 
             if (deleted) {
 
@@ -313,10 +408,117 @@ public class PaymentDAOImpl implements PaymentDAO {
         return false;
     }
 
-    private Payment mapResultSetToPayment(ResultSet resultSet)
+
+    // =========================================================
+    // HELPER: CREATE PARAMETERS
+    // =========================================================
+
+    private void setPaymentCreateParameters(
+            PreparedStatement statement,
+            Payment payment)
             throws SQLException {
 
-        logger.info("mapResultSetToPayment() started");
+        statement.setLong(
+                1,
+                payment.getBooking().getBookingId()
+        );
+
+        statement.setBigDecimal(
+                2,
+                payment.getAmount()
+        );
+
+        statement.setString(
+                3,
+                payment.getPaymentStatus()
+        );
+
+        statement.setString(
+                4,
+                payment.getTransactionRef()
+        );
+
+        statement.setTimestamp(
+                5,
+                payment.getPaidAt()
+        );
+    }
+
+
+    // =========================================================
+    // HELPER: UPDATE PARAMETERS
+    // =========================================================
+
+    private void setPaymentUpdateParameters(
+            PreparedStatement statement,
+            Payment payment)
+            throws SQLException {
+
+        statement.setLong(
+                1,
+                payment.getBooking().getBookingId()
+        );
+
+        statement.setBigDecimal(
+                2,
+                payment.getAmount()
+        );
+
+        statement.setString(
+                3,
+                payment.getPaymentStatus()
+        );
+
+        statement.setString(
+                4,
+                payment.getTransactionRef()
+        );
+
+        statement.setTimestamp(
+                5,
+                payment.getPaidAt()
+        );
+
+        statement.setLong(
+                6,
+                payment.getPaymentId()
+        );
+    }
+
+
+    // =========================================================
+    // HELPER: GENERATED PAYMENT ID
+    // =========================================================
+
+    private void setGeneratedPaymentId(
+            PreparedStatement statement,
+            Payment payment)
+            throws SQLException {
+
+        try (ResultSet keys =
+                     statement.getGeneratedKeys()) {
+
+            if (keys.next()) {
+
+                payment.setPaymentId(
+                        keys.getLong(1)
+                );
+            }
+        }
+    }
+
+
+    // =========================================================
+    // RESULT SET MAPPING
+    // =========================================================
+
+    private Payment mapResultSetToPayment(
+            ResultSet resultSet)
+            throws SQLException {
+
+        logger.info(
+                "mapResultSetToPayment() started"
+        );
 
         Booking booking = new Booking();
 
