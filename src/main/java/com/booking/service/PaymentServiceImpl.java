@@ -2,10 +2,13 @@ package com.booking.service;
 
 import com.booking.dao.PaymentDAO;
 import com.booking.dao.PaymentDAOImpl;
+import com.booking.exception.ResourceNotFoundException;
+import com.booking.exception.ValidationException;
 import com.booking.model.Payment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public class PaymentServiceImpl implements PaymentService {
@@ -19,10 +22,37 @@ public class PaymentServiceImpl implements PaymentService {
         this.paymentDAO = new PaymentDAOImpl();
     }
 
+    public PaymentServiceImpl(PaymentDAO paymentDAO) {
+        this.paymentDAO = paymentDAO;
+    }
+
     @Override
     public boolean createPayment(Payment payment) {
 
         logger.info("createPayment() started");
+
+        // Validation
+        if (payment == null) {
+            throw new ValidationException("Payment cannot be null");
+        }
+
+        if (payment.getBooking() == null) {
+            throw new ValidationException("Payment booking cannot be null");
+        }
+
+        if (payment.getAmount() == null ||
+                payment.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException(
+                    "Payment amount cannot be negative"
+            );
+        }
+
+        if (payment.getPaymentStatus() == null ||
+                payment.getPaymentStatus().trim().isEmpty()) {
+            throw new ValidationException(
+                    "Payment status cannot be empty"
+            );
+        }
 
         boolean created = paymentDAO.create(payment);
 
@@ -46,19 +76,30 @@ public class PaymentServiceImpl implements PaymentService {
                 paymentId
         );
 
+        // Validation
+        if (paymentId <= 0) {
+            throw new ValidationException(
+                    "Invalid payment ID"
+            );
+        }
+
         Payment payment = paymentDAO.findById(paymentId);
 
-        if (payment != null) {
-            logger.info(
-                    "getPaymentById() completed successfully. paymentId={}",
-                    paymentId
-            );
-        } else {
+        if (payment == null) {
             logger.info(
                     "getPaymentById() completed. Payment not found. paymentId={}",
                     paymentId
             );
+
+            throw new ResourceNotFoundException(
+                    "Payment not found with ID: " + paymentId
+            );
         }
+
+        logger.info(
+                "getPaymentById() completed successfully. paymentId={}",
+                paymentId
+        );
 
         return payment;
     }
@@ -81,26 +122,66 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public boolean updatePayment(Payment payment) {
 
+        logger.info("updatePayment() started");
+
+        // Validation
+        if (payment == null) {
+            throw new ValidationException(
+                    "Payment cannot be null"
+            );
+        }
+
         logger.info(
                 "updatePayment() started. paymentId={}",
                 payment.getPaymentId()
         );
 
+        if (payment.getPaymentId() <= 0) {
+            throw new ValidationException(
+                    "Invalid payment ID"
+            );
+        }
+
+        if (payment.getBooking() == null) {
+            throw new ValidationException(
+                    "Payment booking cannot be null"
+            );
+        }
+
+        if (payment.getAmount() == null ||
+                payment.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationException(
+                    "Payment amount cannot be negative"
+            );
+        }
+
+        if (payment.getPaymentStatus() == null ||
+                payment.getPaymentStatus().trim().isEmpty()) {
+            throw new ValidationException(
+                    "Payment status cannot be empty"
+            );
+        }
+
         boolean updated = paymentDAO.update(payment);
 
-        if (updated) {
-            logger.info(
-                    "updatePayment() completed successfully. paymentId={}",
-                    payment.getPaymentId()
-            );
-        } else {
+        if (!updated) {
             logger.info(
                     "updatePayment() failed. paymentId={}",
                     payment.getPaymentId()
             );
+
+            throw new ResourceNotFoundException(
+                    "Payment not found with ID: " +
+                            payment.getPaymentId()
+            );
         }
 
-        return updated;
+        logger.info(
+                "updatePayment() completed successfully. paymentId={}",
+                payment.getPaymentId()
+        );
+
+        return true;
     }
 
     @Override
@@ -111,20 +192,31 @@ public class PaymentServiceImpl implements PaymentService {
                 paymentId
         );
 
+        // Validation
+        if (paymentId <= 0) {
+            throw new ValidationException(
+                    "Invalid payment ID"
+            );
+        }
+
         boolean deleted = paymentDAO.delete(paymentId);
 
-        if (deleted) {
-            logger.info(
-                    "deletePayment() completed successfully. paymentId={}",
-                    paymentId
-            );
-        } else {
+        if (!deleted) {
             logger.info(
                     "deletePayment() failed. paymentId={}",
                     paymentId
             );
+
+            throw new ResourceNotFoundException(
+                    "Payment not found with ID: " + paymentId
+            );
         }
 
-        return deleted;
+        logger.info(
+                "deletePayment() completed successfully. paymentId={}",
+                paymentId
+        );
+
+        return true;
     }
 }

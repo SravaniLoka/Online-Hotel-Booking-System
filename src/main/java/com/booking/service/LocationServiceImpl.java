@@ -2,6 +2,7 @@ package com.booking.service;
 
 import com.booking.dao.LocationDAO;
 import com.booking.dao.LocationDAOImpl;
+import com.booking.exception.ValidationException;
 import com.booking.model.Location;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +20,29 @@ public class LocationServiceImpl implements LocationService {
         this.locationDAO = new LocationDAOImpl();
     }
 
+    public LocationServiceImpl(LocationDAO locationDAO) {
+        this.locationDAO = locationDAO;
+    }
+
     @Override
     public boolean createLocation(Location location) {
 
         logger.info("createLocation() started");
+
+        // Validation
+        if (location == null) {
+            throw new ValidationException("Location cannot be null");
+        }
+
+        if (location.getName() == null ||
+                location.getName().trim().isEmpty()) {
+            throw new ValidationException("Location name cannot be empty");
+        }
+
+        if (location.getType() == null ||
+                location.getType().trim().isEmpty()) {
+            throw new ValidationException("Location type cannot be empty");
+        }
 
         boolean created = locationDAO.create(location);
 
@@ -45,6 +65,11 @@ public class LocationServiceImpl implements LocationService {
                 "getLocationById() started. locationId={}",
                 locationId
         );
+
+        // Validation
+        if (locationId <= 0) {
+            throw new ValidationException("Invalid location ID");
+        }
 
         Location location = locationDAO.findById(locationId);
 
@@ -81,10 +106,31 @@ public class LocationServiceImpl implements LocationService {
     @Override
     public boolean updateLocation(Location location) {
 
+        logger.info("updateLocation() started");
+
+        // Validation
+        if (location == null) {
+            throw new ValidationException("Location cannot be null");
+        }
+
         logger.info(
                 "updateLocation() started. locationId={}",
                 location.getLocationId()
         );
+
+        if (location.getLocationId() <= 0) {
+            throw new ValidationException("Invalid location ID");
+        }
+
+        if (location.getName() == null ||
+                location.getName().trim().isEmpty()) {
+            throw new ValidationException("Location name cannot be empty");
+        }
+
+        if (location.getType() == null ||
+                location.getType().trim().isEmpty()) {
+            throw new ValidationException("Location type cannot be empty");
+        }
 
         boolean updated = locationDAO.update(location);
 
@@ -110,6 +156,11 @@ public class LocationServiceImpl implements LocationService {
                 "deleteLocation() started. locationId={}",
                 locationId
         );
+
+        // Validation
+        if (locationId <= 0) {
+            throw new ValidationException("Invalid location ID");
+        }
 
         boolean deleted = locationDAO.delete(locationId);
 

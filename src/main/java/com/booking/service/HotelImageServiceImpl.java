@@ -2,6 +2,8 @@ package com.booking.service;
 
 import com.booking.dao.HotelImageDAO;
 import com.booking.dao.HotelImageDAOImpl;
+import com.booking.exception.ResourceNotFoundException;
+import com.booking.exception.ValidationException;
 import com.booking.model.HotelImage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +21,32 @@ public class HotelImageServiceImpl implements HotelImageService {
         this.hotelImageDAO = new HotelImageDAOImpl();
     }
 
+    public HotelImageServiceImpl(HotelImageDAO hotelImageDAO) {
+        this.hotelImageDAO = hotelImageDAO;
+    }
+
     @Override
     public boolean createHotelImage(HotelImage hotelImage) {
 
         logger.info("createHotelImage() started");
+
+        // Validation
+        if (hotelImage == null) {
+            throw new ValidationException("Hotel image cannot be null");
+        }
+
+        if (hotelImage.getHotel() == null) {
+            throw new ValidationException(
+                    "Hotel image hotel cannot be null"
+            );
+        }
+
+        if (hotelImage.getImageUrl() == null ||
+                hotelImage.getImageUrl().trim().isEmpty()) {
+            throw new ValidationException(
+                    "Image URL cannot be empty"
+            );
+        }
 
         boolean created = hotelImageDAO.create(hotelImage);
 
@@ -46,19 +70,31 @@ public class HotelImageServiceImpl implements HotelImageService {
                 imageId
         );
 
+        // Validation
+        if (imageId <= 0) {
+            throw new ValidationException(
+                    "Invalid image ID"
+            );
+        }
+
         HotelImage hotelImage = hotelImageDAO.findById(imageId);
 
-        if (hotelImage != null) {
-            logger.info(
-                    "getHotelImageById() completed successfully. imageId={}",
-                    imageId
-            );
-        } else {
+        if (hotelImage == null) {
+
             logger.info(
                     "getHotelImageById() completed. Hotel image not found. imageId={}",
                     imageId
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel image not found with ID: " + imageId
+            );
         }
+
+        logger.info(
+                "getHotelImageById() completed successfully. imageId={}",
+                imageId
+        );
 
         return hotelImage;
     }
@@ -68,7 +104,8 @@ public class HotelImageServiceImpl implements HotelImageService {
 
         logger.info("getAllHotelImages() started");
 
-        List<HotelImage> hotelImages = hotelImageDAO.findAll();
+        List<HotelImage> hotelImages =
+                hotelImageDAO.findAll();
 
         logger.info(
                 "getAllHotelImages() completed successfully. imagesFound={}",
@@ -81,26 +118,60 @@ public class HotelImageServiceImpl implements HotelImageService {
     @Override
     public boolean updateHotelImage(HotelImage hotelImage) {
 
+        logger.info("updateHotelImage() started");
+
+        // Validation
+        if (hotelImage == null) {
+            throw new ValidationException(
+                    "Hotel image cannot be null"
+            );
+        }
+
         logger.info(
                 "updateHotelImage() started. imageId={}",
                 hotelImage.getImageId()
         );
 
+        if (hotelImage.getImageId() <= 0) {
+            throw new ValidationException(
+                    "Invalid image ID"
+            );
+        }
+
+        if (hotelImage.getHotel() == null) {
+            throw new ValidationException(
+                    "Hotel image hotel cannot be null"
+            );
+        }
+
+        if (hotelImage.getImageUrl() == null ||
+                hotelImage.getImageUrl().trim().isEmpty()) {
+            throw new ValidationException(
+                    "Image URL cannot be empty"
+            );
+        }
+
         boolean updated = hotelImageDAO.update(hotelImage);
 
-        if (updated) {
-            logger.info(
-                    "updateHotelImage() completed successfully. imageId={}",
-                    hotelImage.getImageId()
-            );
-        } else {
+        if (!updated) {
+
             logger.info(
                     "updateHotelImage() failed. imageId={}",
                     hotelImage.getImageId()
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel image not found with ID: " +
+                            hotelImage.getImageId()
+            );
         }
 
-        return updated;
+        logger.info(
+                "updateHotelImage() completed successfully. imageId={}",
+                hotelImage.getImageId()
+        );
+
+        return true;
     }
 
     @Override
@@ -111,20 +182,32 @@ public class HotelImageServiceImpl implements HotelImageService {
                 imageId
         );
 
+        // Validation
+        if (imageId <= 0) {
+            throw new ValidationException(
+                    "Invalid image ID"
+            );
+        }
+
         boolean deleted = hotelImageDAO.delete(imageId);
 
-        if (deleted) {
-            logger.info(
-                    "deleteHotelImage() completed successfully. imageId={}",
-                    imageId
-            );
-        } else {
+        if (!deleted) {
+
             logger.info(
                     "deleteHotelImage() failed. imageId={}",
                     imageId
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel image not found with ID: " + imageId
+            );
         }
 
-        return deleted;
+        logger.info(
+                "deleteHotelImage() completed successfully. imageId={}",
+                imageId
+        );
+
+        return true;
     }
 }

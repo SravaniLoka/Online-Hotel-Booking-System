@@ -2,6 +2,8 @@ package com.booking.service;
 
 import com.booking.dao.HotelDAO;
 import com.booking.dao.HotelDAOImpl;
+import com.booking.exception.ResourceNotFoundException;
+import com.booking.exception.ValidationException;
 import com.booking.model.Hotel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +21,34 @@ public class HotelServiceImpl implements HotelService {
         this.hotelDAO = new HotelDAOImpl();
     }
 
+    public HotelServiceImpl(HotelDAO hotelDAO) {
+        this.hotelDAO = hotelDAO;
+    }
+
     @Override
     public boolean createHotel(Hotel hotel) {
 
         logger.info("createHotel() started");
+
+        // Validation
+        if (hotel == null) {
+            throw new ValidationException("Hotel cannot be null");
+        }
+
+        if (hotel.getName() == null ||
+                hotel.getName().trim().isEmpty()) {
+            throw new ValidationException("Hotel name cannot be empty");
+        }
+
+        if (hotel.getAddress() == null ||
+                hotel.getAddress().trim().isEmpty()) {
+            throw new ValidationException("Hotel address cannot be empty");
+        }
+
+        if (hotel.getStatus() == null ||
+                hotel.getStatus().trim().isEmpty()) {
+            throw new ValidationException("Hotel status cannot be empty");
+        }
 
         boolean created = hotelDAO.create(hotel);
 
@@ -46,19 +72,28 @@ public class HotelServiceImpl implements HotelService {
                 hotelId
         );
 
+        // Validation
+        if (hotelId <= 0) {
+            throw new ValidationException("Invalid hotel ID");
+        }
+
         Hotel hotel = hotelDAO.findById(hotelId);
 
-        if (hotel != null) {
-            logger.info(
-                    "getHotelById() completed successfully. hotelId={}",
-                    hotelId
-            );
-        } else {
+        if (hotel == null) {
             logger.info(
                     "getHotelById() completed. Hotel not found. hotelId={}",
                     hotelId
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel not found with ID: " + hotelId
+            );
         }
+
+        logger.info(
+                "getHotelById() completed successfully. hotelId={}",
+                hotelId
+        );
 
         return hotel;
     }
@@ -81,10 +116,36 @@ public class HotelServiceImpl implements HotelService {
     @Override
     public boolean updateHotel(Hotel hotel) {
 
+        logger.info("updateHotel() started");
+
+        // Validation
+        if (hotel == null) {
+            throw new ValidationException("Hotel cannot be null");
+        }
+
         logger.info(
                 "updateHotel() started. hotelId={}",
                 hotel.getHotelId()
         );
+
+        if (hotel.getHotelId() <= 0) {
+            throw new ValidationException("Invalid hotel ID");
+        }
+
+        if (hotel.getName() == null ||
+                hotel.getName().trim().isEmpty()) {
+            throw new ValidationException("Hotel name cannot be empty");
+        }
+
+        if (hotel.getAddress() == null ||
+                hotel.getAddress().trim().isEmpty()) {
+            throw new ValidationException("Hotel address cannot be empty");
+        }
+
+        if (hotel.getStatus() == null ||
+                hotel.getStatus().trim().isEmpty()) {
+            throw new ValidationException("Hotel status cannot be empty");
+        }
 
         boolean updated = hotelDAO.update(hotel);
 
@@ -98,9 +159,13 @@ public class HotelServiceImpl implements HotelService {
                     "updateHotel() failed. hotelId={}",
                     hotel.getHotelId()
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel not found with ID: " + hotel.getHotelId()
+            );
         }
 
-        return updated;
+        return true;
     }
 
     @Override
@@ -111,20 +176,29 @@ public class HotelServiceImpl implements HotelService {
                 hotelId
         );
 
+        // Validation
+        if (hotelId <= 0) {
+            throw new ValidationException("Invalid hotel ID");
+        }
+
         boolean deleted = hotelDAO.delete(hotelId);
 
-        if (deleted) {
-            logger.info(
-                    "deleteHotel() completed successfully. hotelId={}",
-                    hotelId
-            );
-        } else {
+        if (!deleted) {
             logger.info(
                     "deleteHotel() failed. hotelId={}",
                     hotelId
             );
+
+            throw new ResourceNotFoundException(
+                    "Hotel not found with ID: " + hotelId
+            );
         }
 
-        return deleted;
+        logger.info(
+                "deleteHotel() completed successfully. hotelId={}",
+                hotelId
+        );
+
+        return true;
     }
 }
